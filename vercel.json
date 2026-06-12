@@ -1,0 +1,5 @@
+{
+  "buildCommand": "echo 'Built'",
+  "outputDirectory": ".",
+  "public": true
+}
