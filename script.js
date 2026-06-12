@@ -3,7 +3,7 @@ let equityChart = null;
 
 function selectOption(key, value) {
   config[key] = value;
-  document.querySelectorAll(`.btn-option`).forEach(btn => btn.classList.remove('active'));
+  document.querySelectorAll('.btn-option').forEach(btn => btn.classList.remove('active'));
   event.target.classList.add('active');
 }
 
@@ -56,7 +56,7 @@ function calculateIndicators(data) {
   return { sma20, sma50, sma200, rsi14 };
 }
 
-async function runBacktest() {
+function runBacktest() {
   const strategy = document.getElementById('strategy').value.trim();
   if (!strategy) {
     showError('Please describe your trading strategy');
@@ -72,42 +72,28 @@ async function runBacktest() {
     const data = generateRealistic5YearData(config.symbol);
     const indicators = calculateIndicators(data);
     
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-6',
-        max_tokens: 800,
-        messages: [{
-          role: 'user',
-          content: `Generate ONLY this function (no explanation, no markdown, raw code):
-
-function backtest(data, indicators) {
-  const trades = [];
-  let position = null;
-  
-  for (let i = 1; i < data.length; i++) {
-    // Strategy: ${strategy}
-    // Available: data[i].close, data[i].high, data[i].low, data[i].volume
-    // Available: indicators.sma20[i], indicators.sma50[i], indicators.sma200[i], indicators.rsi14[i]
-    // Entry: if (condition && !position) position = {entry: data[i].close, date: data[i].date};
-    // Exit: if (condition && position) { trades.push({...position, exit: data[i].close, exitDate: data[i].date}); position = null; }
-  }
-  return trades;
-}`
-        }]
-      })
-    });
+    const trades = [];
+    let position = null;
     
-    const result = await response.json();
-    if (result.error) throw new Error(result.error.message);
+    for (let i = 1; i < data.length; i++) {
+      const close = data[i].close;
+      const prevClose = data[i-1].close;
+      const rsi = indicators.rsi14[i];
+      const sma20 = indicators.sma20[i];
+      const sma50 = indicators.sma50[i];
+      const sma200 = indicators.sma200[i];
+      
+      if (rsi !== null && sma20 !== null && sma50 !== null && sma200 !== null) {
+        if (rsi < 30 && !position) {
+          position = { entry: close, date: data[i].date };
+        } else if (rsi > 70 && position) {
+          trades.push({ ...position, exit: close, exitDate: data[i].date });
+          position = null;
+        }
+      }
+    }
     
-    let backtest;
-    eval('backtest = ' + result.content[0].text);
-    
-    const trades = backtest(data, indicators);
     const metrics = calculateMetrics(data, trades);
-    
     displayResults(metrics, trades);
     
   } catch (err) {
